@@ -1,0 +1,5 @@
+int count;
+int total;
+total = 0;
+print(total);
+print(count);

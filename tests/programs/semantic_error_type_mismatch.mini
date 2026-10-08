@@ -1,0 +1,5 @@
+real price;
+int total;
+price = 9.99;
+total = price * 2;
+print(total);

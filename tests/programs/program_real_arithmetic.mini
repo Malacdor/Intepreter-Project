@@ -1,0 +1,12 @@
+real price;
+real tax;
+int qty;
+price = 2.5;
+qty = 4;
+tax = 0.5;
+print(price * qty);
+print(price * qty * (1.0 + tax));
+print(7 / 2);
+print(7.0 / 2);
+price = 3;
+print(price);

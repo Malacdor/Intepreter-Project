@@ -1,0 +1,7 @@
+int a;
+int b;
+a = 10;
+b = 0;
+print(a);
+print(a / b);
+print(b);
