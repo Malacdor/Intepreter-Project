@@ -10,26 +10,20 @@ that it makes sense, before anything runs:
   - a real value is never stored in an int variable
 
 It walks the AST in order, keeping a symbol table of each variable's
-declared type and whether it has been assigned yet. MiniLang has no
+declared type and whether it has been initialized yet. MiniLang has no
 branches or loops, so statements always run top to bottom, which makes
-the "assigned yet?" check exact rather than a guess.
+the "initialized yet?" check exact rather than a guess.
 """
 
 from src.ast_nodes import (Assignment, BinaryExpression, Declaration, Identifier,
                            IntegerLiteral, PrintStatement, RealLiteral)
 from src.errors import MiniLangSemanticError
-
-
-class Symbol:
-    def __init__(self, type_name, line):
-        self.type_name = type_name  # "int" or "real"
-        self.declared_line = line
-        self.assigned = False
+from src.symbol_table import SymbolTable
 
 
 class SemanticAnalyzer:
     def __init__(self):
-        self._symbols = {}  # name -> Symbol
+        self._symbols = SymbolTable()
 
     def analyze(self, program):
         """Check the whole program, raising MiniLangSemanticError on the
@@ -53,23 +47,23 @@ class SemanticAnalyzer:
                 f"Unknown statement {type(statement).__name__}.")
 
     def _check_declaration(self, statement):
-        existing = self._symbols.get(statement.name)
+        existing = self._symbols.lookup(statement.name)
         if existing is not None:
             raise MiniLangSemanticError(
                 statement.line,
                 f"Variable '{statement.name}' is already declared "
                 f"(first declared on line {existing.declared_line}).")
-        self._symbols[statement.name] = Symbol(statement.type_name,
-                                               statement.line)
+        self._symbols.declare(statement.name, statement.type_name,
+                              statement.line)
 
     def _check_assignment(self, statement):
-        symbol = self._symbols.get(statement.name)
+        symbol = self._symbols.lookup(statement.name)
         if symbol is None:
             raise MiniLangSemanticError(
                 statement.line,
                 f"Variable '{statement.name}' is assigned before it is declared.")
 
-        # Check the right-hand side before marking the variable assigned,
+        # Check the right-hand side before marking the variable initialized,
         # so "int x; x = x + 1;" is caught as using x before it has a value.
         value_type = self._type_of(statement.expression)
 
@@ -80,7 +74,7 @@ class SemanticAnalyzer:
                 f"Type mismatch: cannot assign a real value to int "
                 f"variable '{statement.name}'.")
 
-        symbol.assigned = True
+        symbol.initialized = True
 
     # ---- expressions ----
 
@@ -104,12 +98,12 @@ class SemanticAnalyzer:
             f"Unknown expression {type(expression).__name__}.")
 
     def _check_identifier(self, identifier):
-        symbol = self._symbols.get(identifier.name)
+        symbol = self._symbols.lookup(identifier.name)
         if symbol is None:
             raise MiniLangSemanticError(
                 identifier.line,
                 f"Variable '{identifier.name}' is used before it is declared.")
-        if not symbol.assigned:
+        if not symbol.initialized:
             raise MiniLangSemanticError(
                 identifier.line,
                 f"Variable '{identifier.name}' is used before it is assigned a value.")

@@ -26,7 +26,7 @@ def semantic_error(source):
 # --- valid programs ---
 
 def test_empty_program():
-    assert analyze("") == {}
+    assert len(analyze("")) == 0
 
 
 def test_declare_assign_print():
@@ -36,9 +36,9 @@ def test_declare_assign_print():
 def test_symbol_table_records_types():
     symbols = analyze("int count; real price; count = 1;")
     assert symbols["count"].type_name == "int"
-    assert symbols["count"].assigned
+    assert symbols["count"].initialized
     assert symbols["price"].type_name == "real"
-    assert not symbols["price"].assigned
+    assert not symbols["price"].initialized
 
 
 def test_int_value_into_real_variable_is_allowed():

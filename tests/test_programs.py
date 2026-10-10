@@ -31,9 +31,31 @@ def test_program_output(program, capsys):
     assert finished == ("Error on line" not in printed)
 
 
-def test_debug_mode_prints_tokens(capsys):
-    assert run("int x; x = 1; print(x);", debug=True)
+def test_debug_mode_shows_all_four_sections(capsys):
+    assert run("int x; real y; x = 1; print(x);", debug=True)
     out = capsys.readouterr().out
+
+    # Sections appear in pipeline order.
+    headings = ["TOKENS", "AST", "SYMBOL TABLE", "PROGRAM OUTPUT"]
+    positions = [out.index(f"{heading}\n") for heading in headings]
+    assert positions == sorted(positions)
+
     assert "IDENTIFIER(x)" in out
-    assert "INTEGER_LITERAL(1)" in out
+    assert "Declaration(int x)" in out
+    assert "x int 1" in out
+    assert "y real (uninitialized)" in out
     assert out.rstrip().endswith("1")
+
+
+def test_debug_mode_after_runtime_error(capsys):
+    # The symbol table and output so far are still shown before the error.
+    assert not run("int a; a = 5; print(a); print(a / 0);", debug=True)
+    captured = capsys.readouterr()
+    assert "a int 5" in captured.out
+    assert captured.out.rstrip().endswith("5")
+    assert captured.err.strip() == "Runtime Error on line 1: Division by zero."
+
+
+def test_normal_mode_shows_only_program_output(capsys):
+    assert run("int x; x = 1; print(x);")
+    assert capsys.readouterr().out == "1\n"

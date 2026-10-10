@@ -10,7 +10,7 @@ import pytest
 from src.ast_nodes import (Assignment, BinaryExpression, Declaration, Identifier,
                            IntegerLiteral, PrintStatement, Program, RealLiteral)
 from src.errors import MiniLangRuntimeError
-from src.Interpreter import Interpreter
+from src.Interpreter import Interpreter, format_value
 
 
 def run(*statements):
@@ -92,11 +92,89 @@ def test_assignment_can_use_the_variables_old_value():
 
 
 def test_int_assigned_to_real_variable_becomes_real():
-    assert run(
+    interpreter = Interpreter(output=lambda line: None)
+    interpreter.run(Program([
         Declaration("real", "r", 1),
         Assignment("r", num(5), 2),
-        print_(var("r")),
-    ) == ["5.0"]
+    ]))
+    [(name, type_name, initialized, value)] = interpreter.symbol_table()
+    assert (name, type_name, initialized) == ("r", "real", True)
+    assert isinstance(value, float) and value == 5.0
+
+
+# --- printing reals ---
+
+@pytest.mark.parametrize("value, expected", [
+    (20.0, "20"),     # whole-number reals print like ints (spec section 18)
+    (-3.0, "-3"),
+    (0.0, "0"),
+    (2.5, "2.5"),
+    (3.14, "3.14"),
+    (-0.5, "-0.5"),
+    (7, "7"),
+])
+def test_format_value(value, expected):
+    assert format_value(value) == expected
+
+
+def test_spec_end_to_end_example():
+    # int x; real y; x = 10; y = x + 5 * 2; print(y);  ->  20
+    assert run(
+        Declaration("int", "x", 1),
+        Declaration("real", "y", 2),
+        Assignment("x", num(10), 3),
+        Assignment("y", binary(var("x"), "+", binary(num(5), "*", num(2))), 4),
+        print_(var("y")),
+    ) == ["20"]
+
+
+# --- symbol table ---
+
+def test_symbol_table_after_a_run():
+    interpreter = Interpreter(output=lambda line: None)
+    interpreter.run(Program([
+        Declaration("int", "width", 1),
+        Declaration("real", "ratio", 2),
+        Declaration("int", "unused", 3),
+        Assignment("width", num(10), 4),
+        Assignment("ratio", num(0.5), 5),
+    ]))
+    assert interpreter.symbol_table() == [
+        ("width", "int", True, 10),
+        ("ratio", "real", True, 0.5),
+        ("unused", "int", False, None),
+    ]
+
+
+def test_symbol_table_shows_latest_value():
+    interpreter = Interpreter(output=lambda line: None)
+    interpreter.run(Program([
+        Declaration("int", "x", 1),
+        Assignment("x", num(1), 2),
+        Assignment("x", num(99), 3),
+    ]))
+    assert interpreter.symbol_table() == [("x", "int", True, 99)]
+
+
+def test_symbol_table_keeps_state_from_before_a_runtime_error():
+    interpreter = Interpreter(output=lambda line: None)
+    with pytest.raises(MiniLangRuntimeError):
+        interpreter.run(Program([
+            Declaration("int", "a", 1),
+            Assignment("a", num(10), 2),
+            Declaration("int", "b", 3),
+            Assignment("b", binary(var("a"), "/", num(0)), 4),
+        ]))
+    assert interpreter.symbol_table() == [
+        ("a", "int", True, 10),
+        ("b", "int", False, None),
+    ]
+
+
+def test_empty_symbol_table():
+    interpreter = Interpreter(output=lambda line: None)
+    interpreter.run(Program([]))
+    assert interpreter.symbol_table() == []
 
 
 # --- arithmetic ---
@@ -105,8 +183,8 @@ def test_int_assigned_to_real_variable_becomes_real():
     (10, "+", 5, "15"),
     (10, "-", 15, "-5"),
     (6, "*", 7, "42"),
-    (2.5, "+", 1.5, "4.0"),
-    (1.5, "*", 2.0, "3.0"),
+    (2.5, "+", 1.5, "4"),
+    (1.5, "*", 2.0, "3"),
     (7.0, "/", 2.0, "3.5"),
 ])
 def test_basic_operators(left, operator, right, expected):

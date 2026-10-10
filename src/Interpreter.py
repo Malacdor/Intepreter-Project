@@ -2,8 +2,8 @@
 Interpreter for MiniLang.
 
 Walks the AST the parser produced and actually runs the program: it keeps
-track of each variable's type and value, evaluates expressions, and
-prints whatever print statements ask for.
+each variable's type and current value in a symbol table, evaluates
+expressions, and prints whatever print statements ask for.
 
 The semantic analyzer should catch most mistakes before we get here, but
 the interpreter still checks the ones that would otherwise crash Python
@@ -14,6 +14,7 @@ MiniLang error instead of a traceback.
 from src.ast_nodes import (Assignment, BinaryExpression, Declaration, Identifier,
                            IntegerLiteral, PrintStatement, RealLiteral)
 from src.errors import MiniLangRuntimeError
+from src.symbol_table import SymbolTable
 
 
 class Interpreter:
@@ -22,12 +23,17 @@ class Interpreter:
         # Tests pass in a list's append to capture output instead of
         # writing to the screen.
         self._output = output
-        self._types = {}   # name -> "int" or "real"
-        self._values = {}  # name -> current value; missing until assigned
+        self._symbols = SymbolTable()
 
     def run(self, program):
         for statement in program.statements:
             self._execute(statement)
+
+    def symbol_table(self):
+        """The variables as (name, type, initialized, value) rows, in the
+        order they were declared. Debug mode shows these after a run, and
+        after a runtime error they show the state at the failure."""
+        return self._symbols.rows()
 
     # ---- statements ----
 
@@ -44,22 +50,23 @@ class Interpreter:
                 f"Don't know how to run {type(statement).__name__}.")
 
     def _declare(self, statement):
-        if statement.name in self._types:
+        if statement.name in self._symbols:
             raise MiniLangRuntimeError(
                 statement.line,
                 f"Variable '{statement.name}' is already declared.")
-        self._types[statement.name] = statement.type_name
+        self._symbols.declare(statement.name, statement.type_name,
+                              statement.line)
 
     def _assign(self, statement):
-        declared_type = self._types.get(statement.name)
-        if declared_type is None:
+        symbol = self._symbols.lookup(statement.name)
+        if symbol is None:
             raise MiniLangRuntimeError(
                 statement.line,
                 f"Variable '{statement.name}' is assigned before it is declared.")
 
         value = self._evaluate(statement.expression)
 
-        if declared_type == "real":
+        if symbol.type_name == "real":
             # Ints widen to reals, so "real r; r = 5;" stores 5.0.
             value = float(value)
         elif isinstance(value, float):
@@ -67,7 +74,8 @@ class Interpreter:
                 statement.line,
                 f"Cannot assign a real value to int variable '{statement.name}'.")
 
-        self._values[statement.name] = value
+        symbol.value = value
+        symbol.initialized = True
 
     # ---- expressions ----
 
@@ -88,15 +96,16 @@ class Interpreter:
             f"Don't know how to evaluate {type(expression).__name__}.")
 
     def _lookup(self, identifier):
-        if identifier.name not in self._types:
+        symbol = self._symbols.lookup(identifier.name)
+        if symbol is None:
             raise MiniLangRuntimeError(
                 identifier.line,
                 f"Variable '{identifier.name}' is used before it is declared.")
-        if identifier.name not in self._values:
+        if not symbol.initialized:
             raise MiniLangRuntimeError(
                 identifier.line,
                 f"Variable '{identifier.name}' is used before it is assigned a value.")
-        return self._values[identifier.name]
+        return symbol.value
 
 
 def apply_operator(operator, left, right, line):
@@ -126,6 +135,9 @@ def int_divide(left, right):
 
 
 def format_value(value):
-    # Python already prints ints as "15" and floats as "2.5" or "3.0",
-    # which keeps reals visibly different from ints.
+    # The project description's end-to-end example stores 20 in a real
+    # variable and expects "20" to print, so a real with nothing after the
+    # decimal point prints like an int. Other reals print normally ("2.5").
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
     return str(value)
