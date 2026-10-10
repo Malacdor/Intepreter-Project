@@ -1,0 +1,7 @@
+int width;
+int height;
+int area;
+width = 10;
+height = 5;
+area = width * height;
+print(area);

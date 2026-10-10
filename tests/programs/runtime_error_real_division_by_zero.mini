@@ -1,0 +1,6 @@
+real total;
+real zero;
+total = 7.5;
+zero = 0.0;
+print(total);
+print(total / (zero * 2));

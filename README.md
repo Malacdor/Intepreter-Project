@@ -9,6 +9,10 @@ Invalid programs are rejected with a message that names the error category
 and the line number. The interpreter never shows a Python traceback for a bad
 program.
 
+## Team
+
+Gage Gunn, Diego Salas, S Holton
+
 ## Requirements
 
 Python 3.8 or newer. The interpreter uses only the standard library. Running
@@ -56,8 +60,13 @@ The output has four sections, each with its own heading:
     AST
     ---
     Program
-      Declaration(int width)
-      ...
+    |-- Declaration(int width)
+    |-- Declaration(int height)
+    |-- Declaration(int area)
+    |-- Assignment(=)
+    |   |-- Identifier(width)
+    |   `-- Integer(10)
+    ...
 
     SYMBOL TABLE
     ------------
@@ -92,15 +101,19 @@ each program covers.
 ## Project layout
 
     Main.py                  command line entry point and debug mode
+    pytest.ini               pytest settings (which test files to collect)
     src/Tokens.py            token types and the Token class
     src/Lexical_Analyzer.py  source text to tokens
     src/Parser.py            tokens to AST (recursive descent)
     src/ast_nodes.py         AST node classes
     src/ast_printer.py       AST text display for debug mode
+    src/symbol_table.py      symbol table shared by the analyzer and interpreter
     src/Semantic_Analyzer.py declaration, initialization and type checks
     src/Interpreter.py       runs the AST
     src/errors.py            syntax, semantic and runtime error classes
-    tests/                   unit tests and the .mini test programs
+    tests/                   unit tests, one file per stage
+    tests/programs/          the .mini test programs and their .expected output
+    tests/README.md          what each test program covers
 
 ## Error categories
 
@@ -121,6 +134,11 @@ Processing stops at the first error.
   branches or loops, so "has this variable been assigned yet?" can be answered
   exactly before the program runs. The right side of an assignment is checked
   before the variable counts as assigned, so `int x; x = x + 1;` is rejected.
+* **Symbol table.** One `SymbolTable` class holds the name, type, initialized
+  flag and value of every declared variable. The semantic analyzer fills in
+  everything but the value while it checks the program; the interpreter keeps
+  its own copy and stores values as the program runs, which is the table debug
+  mode shows at the end.
 * **Types.** An `int` may be assigned to a `real` variable and is converted.
   A `real` value cannot be assigned to an `int` variable. An expression with
   any real operand is real.

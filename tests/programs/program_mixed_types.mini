@@ -1,0 +1,11 @@
+int count;
+real average;
+real total;
+count = 4;
+total = 10.5 + count;
+print(total);
+average = total / count;
+print(average);
+print(count * 0.5);
+print(count / 8);
+print(count / 8.0);
