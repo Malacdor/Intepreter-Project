@@ -1,5 +1,3 @@
-
-
 from src.ast_nodes import (Assignment, BinaryExpression, Declaration, Identifier,
                        IntegerLiteral, PrintStatement, Program, RealLiteral)
 from src.errors import MiniLangSyntaxError
@@ -17,15 +15,22 @@ class Parser:
             self._tokens.append(Token(T.EOF, "", last_line))
         self._pos = 0
 
-    # ---- public entry point ----
+    # public entry point 
 
     def parse(self):
         statements = []
-        while not self._check(T.EOF):
-            statements.append(self._statement())
+        try:
+            while not self._check(T.EOF):
+                statements.append(self._statement())
+        except RecursionError:
+            # Hundreds of nested parentheses would otherwise end in a raw
+            # Python traceback, which the project description does not allow.
+            raise MiniLangSyntaxError(
+                self._peek().line,
+                "Expression is nested too deeply to parse.") from None
         return Program(statements)
 
-    # ---- grammar rules ----
+    # grammar rules 
 
     def _statement(self):
         token = self._peek()
